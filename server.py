@@ -4,7 +4,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 import json
 import os
 
-# Logging settings
+# Log settings
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if bot_manager.owner_id is None:
         await update.message.reply_text(
-            "⚠️ Owner not set yet. Use /setowner command."
+            "⚠️ Owner not set yet. Use the /setowner command."
         )
         return
     
@@ -50,7 +50,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("➕ Create Room", callback_data='create_room')],
             [InlineKeyboardButton("🗑 Delete Room", callback_data='delete_room')],
             [InlineKeyboardButton("👤 Manage Admins", callback_data='manage_admins')],
-            [InlineKeyboardButton("📋 Room List", callback_data='list_rooms')]
+            [InlineKeyboardButton("📋 List Rooms", callback_data='list_rooms')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text("👑 Hello Owner! What can I do for you?", reply_markup=reply_markup)
@@ -61,7 +61,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text("Hello! Select a room to send a message:", reply_markup=reply_markup)
         else:
-            await update.message.reply_text("No rooms created yet.")
+            await update.message.reply_text("No rooms have been created yet.")
 
 async def setowner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if bot_manager.owner_id is None:
@@ -69,7 +69,7 @@ async def setowner(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bot_manager.save_data()
         await update.message.reply_text(f"✅ You have been set as owner! (ID: {bot_manager.owner_id})")
     else:
-        await update.message.reply_text(f"⚠️ Owner already set. (ID: {bot_manager.owner_id})")
+        await update.message.reply_text(f"⚠️ Owner is already set. (ID: {bot_manager.owner_id})")
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -177,7 +177,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
     
-    # If user is in the middle of an action
+    # If user is in the middle of an operation
     action = context.user_data.get('action')
     
     if user_id == bot_manager.owner_id:
@@ -213,7 +213,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if selected_room not in bot_manager.rooms:
-        await update.message.reply_text("❌ The selected room doesn't exist.")
+        await update.message.reply_text("❌ The selected room does not exist.")
         return
     
     # Send message to all room admins
@@ -235,11 +235,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Send to admins
     for admin_id in admins:
         try:
+            # Send notification
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=f"📨 New message from user {user_id}\n🏠 Room: {selected_room}"
+            )
+            # Forward original message
+            forwarded = await update.message.forward(chat_id=admin_id)
+            # Send reply button
             keyboard = [[InlineKeyboardButton("💬 Reply", callback_data=f'reply:{message_id}')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.send_message(
                 chat_id=admin_id,
-                text=f"📨 New message from user {user_id}\n🏠 Room: {selected_room}\n\n{text}",
+                text="⬆️ Click the button below to reply:",
                 reply_markup=reply_markup
             )
         except Exception as e:
@@ -247,11 +255,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Send to owner
     try:
+        # Send notification
+        await context.bot.send_message(
+            chat_id=bot_manager.owner_id,
+            text=f"📨 New message from user {user_id}\n🏠 Room: {selected_room}"
+        )
+        # Forward original message
+        forwarded = await update.message.forward(chat_id=bot_manager.owner_id)
+        # Send reply button
         keyboard = [[InlineKeyboardButton("💬 Reply", callback_data=f'reply:{message_id}')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
             chat_id=bot_manager.owner_id,
-            text=f"📨 New message from user {user_id}\n🏠 Room: {selected_room}\n\n{text}",
+            text="⬆️ Click the button below to reply:",
             reply_markup=reply_markup
         )
     except Exception as e:
